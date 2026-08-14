@@ -13,7 +13,7 @@
 	A.screens['profile'] = {
 		render: function ( mount, user, params, app ) {
 			mount.innerHTML = app.spinner();
-			Promise.all( [ app.get( '/user/me' ), app.get( '/user/stats' ) ] )
+			Promise.all( [ app.get( '/me' ), app.get( '/me/stats' ) ] )
 				.then( function ( both ) { renderProfile( mount, both[0], both[1], app ); } )
 				.catch( function () { renderProfile( mount, user || {}, {}, app ); } );
 		}
@@ -23,7 +23,7 @@
 	A.screens['settings'] = {
 		render: function ( mount, user, params, app ) {
 			mount.innerHTML = app.spinner();
-			app.get( '/user/me' ).then( function ( me ) { renderSettings( mount, me, app ); } )
+			app.get( '/me' ).then( function ( me ) { renderSettings( mount, me, app ); } )
 				.catch( function () { renderSettings( mount, user || {}, app ); } );
 		}
 	};
@@ -101,7 +101,7 @@
 
 		document.getElementById( 's-save' ).addEventListener( 'click', function () {
 			var lv = document.querySelector( '[data-lv].selected' ) && document.querySelector( '[data-lv].selected' ).getAttribute( 'data-lv' );
-			app.post( '/user/settings' , {
+			app.post( '/me/settings' , {
 				level: lv || me.level,
 				notification_time: document.getElementById( 's-time' ).value || '07:00',
 				notifications_enabled: document.getElementById( 's-notify' ).checked ? '1' : '0',

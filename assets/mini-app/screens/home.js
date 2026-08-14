@@ -8,7 +8,7 @@
 	A.screens['home'] = {
 		render: function ( mount, user, params, app ) {
 			mount.innerHTML = app.spinner();
-			app.get( '/user/me' ).then( function ( me ) {
+			app.get( '/me' ).then( function ( me ) {
 				app.get( '/lesson/today' ).then( function ( today ) {
 					renderHome( mount, me, today, app );
 				} ).catch( function () {
