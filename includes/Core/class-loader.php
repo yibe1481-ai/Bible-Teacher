@@ -1,10 +1,11 @@
 <?php
 /**
- * PSR-4 style autoloader for the Bible Teacher plugin.
+ * Autoloader for the Bible Teacher plugin.
  *
- * Maps class names (BE_Prefix) to include/ paths. Several classes live in
- * well-known WordPress conventions (class-{name}.php), so we generate candidate
- * files from the class name rather than requiring a rigid namespace map.
+ * Maps BE_ class names to include/ paths via an explicit table. An explicit
+ * map is used (rather than an underscore-splitting heuristic) because many
+ * classes share suffixes (e.g. Manager, Service) and live in distinct
+ * folders; heuristics would collide.
  *
  * @package Bible_Teacher
  */
@@ -17,6 +18,75 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class BE_Loader
  */
 class BE_Loader {
+
+	/**
+	 * Explicit class-name → relative-path map.
+	 *
+	 * @var array
+	 */
+	private static $map = array(
+		// Core.
+		'BE_Plugin'          => 'Core/class-plugin.php',
+		'BE_Loader'          => 'Core/class-loader.php',
+		'BE_Activator'       => 'Core/class-activator.php',
+		'BE_Deactivator'     => 'Core/class-deactivator.php',
+		'BE_Options'         => 'Core/class-options.php',
+		// Database.
+		'BE_Migrator'        => 'Database/class-migrator.php',
+		'BE_Repository'      => 'Database/class-repository.php',
+		// Security.
+		'BE_Security'        => 'Security/class-security.php',
+		// Telegram.
+		'BE_JWT'             => 'Telegram/class-jwt.php',
+		'BE_BotAPI'          => 'Telegram/class-bot-api.php',
+		'BE_Auth'            => 'Telegram/class-auth-service.php',
+		'BE_Webhook'         => 'Telegram/class-webhook-handler.php',
+		// AI.
+		'BE_AI_Manager'      => 'AI/class-ai-manager.php',
+		'BE_AI_Cache'        => 'AI/class-ai-cache.php',
+		'BE_AI_Logger'       => 'AI/class-ai-logger.php',
+		'BE_AI_Feature'      => 'AI/features/class-ai-feature.php',
+		'BE_Vocabulary_Generator' => 'AI/features/class-vocabulary-generator.php',
+		'BE_Quiz_Generator'  => 'AI/features/class-quiz-generator.php',
+		'BE_Speaking_Scorer' => 'AI/features/class-speaking-scorer.php',
+		'BE_Writing_Scorer'  => 'AI/features/class-writing-scorer.php',
+		'BE_Feedback_Generator' => 'AI/features/class-feedback-generator.php',
+		'BE_Preview_Generator'=> 'AI/features/class-preview-generator.php',
+		'BE_OpenAI_Adapter'  => 'AI/adapters/class-openai-compatible-adapter.php',
+		// Bible.
+		'BE_Bible'           => 'Bible/class-bible-api.php',
+		'BE_Verse_Sequencer' => 'Bible/class-verse-sequencer.php',
+		// Voice.
+		'BE_TTS_Service'     => 'Voice/class-tts-service.php',
+		'BE_Whisper'         => 'Voice/class-whisper-service.php',
+		// Competition.
+		'BE_XP_Manager'      => 'Competition/class-xp-manager.php',
+		'BE_League_Manager'  => 'Competition/class-league-manager.php',
+		'BE_Championship_Manager' => 'Competition/class-championship-manager.php',
+		// Badges.
+		'BE_Badge_Manager'   => 'Badges/class-badge-manager.php',
+		// Groups.
+		'BE_Group_Manager'   => 'Groups/class-group-manager.php',
+		// Notifications.
+		'BE_Notification_Manager' => 'Notifications/class-notification-manager.php',
+		// Users & Lessons.
+		'BE_User_Service'    => 'Users/class-user-service.php',
+		'BE_Lesson_Service'  => 'Lessons/class-lesson-service.php',
+		'BE_Streak'          => 'Lessons/class-streak-service.php',
+		// Cron.
+		'BE_Cron'            => 'Cron/class-cron.php',
+		// Admin (lives outside includes/).
+		'BE_Admin'           => '../admin/class-admin.php',
+		// REST controllers (see includes/REST/controllers).
+		'BE_REST_Base'       => 'REST/class-rest-base.php',
+		'BE_Auth_Controller' => 'REST/controllers/class-auth-controller.php',
+		'BE_User_Controller' => 'REST/controllers/class-user-controller.php',
+		'BE_Placement_Controller' => 'REST/controllers/class-placement-controller.php',
+		'BE_Lesson_Controller' => 'REST/controllers/class-lesson-controller.php',
+		'BE_League_Controller'=> 'REST/controllers/class-league-controller.php',
+		'BE_Group_Controller'=> 'REST/controllers/class-group-controller.php',
+		'BE_Admin_Controller'=> 'REST/controllers/class-admin-controller.php',
+	);
 
 	/**
 	 * Register the autoloader with SPL.
@@ -34,115 +104,15 @@ class BE_Loader {
 	 * @return void
 	 */
 	public static function autoload( $class ) {
-		if ( 0 !== strpos( $class, 'BE_' ) ) {
+		if ( ! isset( self::$map[ $class ] ) ) {
 			return;
 		}
 
-		$relative = self::class_to_path( $class );
-		if ( ! $relative ) {
-			return;
-		}
-
-		$base = BIBLE_TEACHER_DIR . 'includes/';
-		$file = $base . $relative;
+		$file = BIBLE_TEACHER_DIR . 'includes/' . self::$map[ $class ];
 
 		if ( is_readable( $file ) ) {
 			require_once $file;
 		}
-	}
-
-	/**
-	 * Convert a BE_ class name to a relative file path.
-	 *
-	 * @param string $class Class name.
-	 * @return string|false
-	 */
-	private static function class_to_path( $class ) {
-		// Strip the BE_ prefix.
-		$name = substr( $class, 3 );
-
-		// Aliases where the class name does not match its folder name, or
-		// is a single segment that the underscore splitter cannot place.
-		static $folders = array(
-			'AI_Manager'        => 'AI/class-ai-manager',
-			'AI_Cache'          => 'AI/class-ai-cache',
-			'AI_Logger'         => 'AI/class-ai-logger',
-			'OpenAI_Adapter'    => 'AI/adapters/class-openai-compatible-adapter',
-			'Options'           => 'Core/class-options',
-			'AI_Feature'        => 'AI/features/class-ai-feature',
-			'Vocabulary_Generator' => 'AI/features/class-vocabulary-generator',
-			'Quiz_Generator'    => 'AI/features/class-quiz-generator',
-			'Speaking_Scorer'   => 'AI/features/class-speaking-scorer',
-			'Writing_Scorer'    => 'AI/features/class-writing-scorer',
-			'Feedback_Generator'=> 'AI/features/class-feedback-generator',
-			'Preview_Generator' => 'AI/features/class-preview-generator',
-		);
-
-		if ( isset( $folders[ $name ] ) ) {
-			return $folders[ $name ] . '.php';
-		}
-
-		// Split on underscores to find the first-level directory.
-		$parts = explode( '_', $name );
-		if ( count( $parts ) < 2 ) {
-			return false;
-		}
-
-		$top    = array_shift( $parts );
-		$folder = self::dir_for_top( $top );
-
-		if ( ! $folder ) {
-			return false;
-		}
-
-		$file_base = implode( '-', $parts );
-		$file_base = strtolower( $file_base );
-
-		return $folder . '/class-' . $file_base . '.php';
-	}
-
-	/**
-	 * Map the first segment of the class name to a base folder under includes/.
-	 *
-	 * @param string $top First segment (before first underscore).
-	 * @return string|false
-	 */
-	private static function dir_for_top( $top ) {
-		$dirs = array(
-			'Plugin'       => 'Core',
-			'Loader'       => 'Core',
-			'Activator'    => 'Core',
-			'Deactivator'  => 'Core',
-			'Migrator'     => 'Database',
-			'Repository'   => 'Database',
-			'REST'         => 'REST',
-			'User'         => 'Users',
-			'Lesson'       => 'Lessons',
-			'Streak'       => 'Lessons',
-			'Bible'        => 'Bible',
-			'TTSService'   => 'Voice',
-			'Whisper'      => 'Voice',
-			'XP'           => 'Competition',
-			'League'       => 'Competition',
-			'Championship' => 'Competition',
-			'Badge'        => 'Badges',
-			'Group'        => 'Groups',
-			'Notification' => 'Notifications',
-			'BotAPI'       => 'Telegram',
-			'Webhook'      => 'Telegram',
-			'Auth'         => 'Telegram',
-			'JWT'          => 'Telegram',
-			'MiniApp'      => 'Telegram',
-			'Security'     => 'Security',
-			'Cron'         => 'Cron',
-			'AI'           => 'AI',
-		);
-
-		if ( isset( $dirs[ $top ] ) ) {
-			return $dirs[ $top ];
-		}
-
-		return false;
 	}
 }
 
