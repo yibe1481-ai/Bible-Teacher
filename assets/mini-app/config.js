@@ -6,7 +6,8 @@
  * the app is hosted on a separate origin.
  */
 // Preserve a config injected server-side (BE_MiniApp router). Otherwise build
-// a sensible default: same-origin WordPress REST namespace.
+// a sensible default: root-relative WordPress REST namespace, which shares the
+// page's origin & scheme so the Authorization header is never lost to CORS.
 window.BE_CONFIG = window.BE_CONFIG || {
-	API_BASE: window.BE_API_BASE || window.location.origin + '/wp-json/be/v1',
+	API_BASE: window.BE_API_BASE || '/wp-json/be/v1',
 };

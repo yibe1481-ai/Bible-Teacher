@@ -36,7 +36,21 @@ class BE_MiniApp {
 		$this->base_dir = BIBLE_TEACHER_DIR . 'assets/mini-app/';
 		$this->base_url = BIBLE_TEACHER_URL . 'assets/mini-app/';
 		// Bump to force browsers/WebViews to re-fetch assets after updates.
-		$this->asset_ver = BIBLE_TEACHER_VERSION . '-' . substr( (string) filemtime( $this->base_dir . 'app.js' ), -6 );
+		// Use the newest mtime across all app source files so any edit (config,
+		// app, screens, styles) invalidates the whole bundle's cache.
+		$newest = 0;
+		$files  = array( 'index.html', 'config.js', 'app.js', 'styles.css' );
+		$screens = glob( $this->base_dir . 'screens/*.js' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( is_array( $screens ) ) {
+			$files = array_merge( $files, $screens );
+		}
+		foreach ( $files as $file ) {
+			$m = filemtime( $this->base_dir . $file );
+			if ( is_int( $m ) && $m > $newest ) {
+				$newest = $m;
+			}
+		}
+		$this->asset_ver = BIBLE_TEACHER_VERSION . '-' . substr( (string) $newest, -6 );
 	}
 
 	/**
@@ -76,8 +90,11 @@ class BE_MiniApp {
 		);
 
 		// Inject runtime config before config.js loads (match the versioned URL).
+		// Use a root-relative API base so it always shares the page's origin &
+		// scheme — avoids cross-origin CORS preflight dropping the Authorization
+		// header when the app is served over http but rest_url() returns https.
 		$config_json = wp_json_encode( array(
-			'API_BASE'    => rest_url( 'be/v1' ),
+			'API_BASE'    => '/wp-json/be/v1',
 		) );
 		$config_script = '<script src="' . esc_url( $this->base_url . 'config.js' ) . '?v=' . $this->asset_ver . '"></script>';
 		$html = preg_replace(
