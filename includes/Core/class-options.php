@@ -82,4 +82,44 @@ class BE_Options {
 	public static function reset() {
 		self::$cache = null;
 	}
+
+	/**
+	 * Sanitize a submitted options array before storage.
+	 *
+	 * @param array $input Raw settings input.
+	 * @return array Sanitized (only known scalar/array shapes pass through).
+	 */
+	public static function sanitize( $input ) {
+		$defaults = self::all();
+
+		$clean = array();
+		foreach ( $defaults as $section => $section_default ) {
+			if ( ! isset( $input[ $section ] ) || ! is_array( $section_default ) ) {
+				continue;
+			}
+			$clean[ $section ] = array();
+			foreach ( $section_default as $key => $value_default ) {
+				if ( ! isset( $input[ $section ][ $key ] ) ) {
+					$clean[ $section ][ $key ] = $value_default;
+					continue;
+				}
+
+				$val = $input[ $section ][ $key ];
+
+				if ( is_bool( $value_default ) ) {
+					$clean[ $section ][ $key ] = (bool) $val;
+				} elseif ( is_int( $value_default ) ) {
+					$clean[ $section ][ $key ] = (int) $val;
+				} elseif ( is_float( $value_default ) ) {
+					$clean[ $section ][ $key ] = (float) $val;
+				} elseif ( is_array( $value_default ) ) {
+					$clean[ $section ][ $key ] = array_map( 'sanitize_text_field', (array) $val );
+				} else {
+					$clean[ $section ][ $key ] = is_array( $val ) ? '' : sanitize_text_field( $val );
+				}
+			}
+		}
+
+		return $clean;
+	}
 }
