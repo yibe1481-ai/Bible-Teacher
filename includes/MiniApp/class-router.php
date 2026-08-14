@@ -26,12 +26,17 @@ class BE_MiniApp {
 	/** @var string Public URL base. */
 	private $base_url;
 
+	/** @var string Cache-busting suffix appended to asset URLs. */
+	private $asset_ver;
+
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		$this->base_dir = BIBLE_TEACHER_DIR . 'assets/mini-app/';
 		$this->base_url = BIBLE_TEACHER_URL . 'assets/mini-app/';
+		// Bump to force browsers/WebViews to re-fetch assets after updates.
+		$this->asset_ver = BIBLE_TEACHER_VERSION . '-' . substr( (string) filemtime( $this->base_dir . 'app.js' ), -6 );
 	}
 
 	/**
@@ -55,8 +60,9 @@ class BE_MiniApp {
 		$base = rtrim( $this->base_url, '/' );
 
 		// Absolutise only relative src/href values (paths like styles.css,
-		// screens/home.js). Already-absolute URLs (http://, //, data:, etc.)
-		// are left untouched.
+		// screens/home.js) and append a cache-busting version so updates are
+		// picked up immediately. Already-absolute URLs (http://, //, data:,
+		// etc.) are left untouched.
 		$html = preg_replace_callback(
 			'/(<(?:link|script)\s[^>]*?\b(?:href|src)\s*=\s*["\'])([^"\']+)(["\'])/i',
 			function ( $m ) use ( $base ) {
@@ -64,19 +70,21 @@ class BE_MiniApp {
 				if ( preg_match( '/^(https?:\/\/|\/\/|data:|#|mailto:|tel:)/i', $url ) ) {
 					return $m[0];
 				}
-				return $m[1] . $base . '/' . ltrim( $url, '/' ) . $m[3];
+				return $m[1] . $base . '/' . ltrim( $url, '/' ) . '?v=' . $this->asset_ver . $m[3];
 			},
 			$html
 		);
 
-		// Inject runtime config before config.js loads.
+		// Inject runtime config before config.js loads (match the versioned URL).
 		$config_json = wp_json_encode( array(
 			'API_BASE'    => rest_url( 'be/v1' ),
 		) );
-		$html = str_replace(
-			'<script src="' . $base . '/config.js"></script>',
-			'<script>window.BE_CONFIG=' . $config_json . ';</script><script src="' . esc_url( $this->base_url . 'config.js' ) . '"></script>',
-			$html
+		$config_script = '<script src="' . esc_url( $this->base_url . 'config.js' ) . '?v=' . $this->asset_ver . '"></script>';
+		$html = preg_replace(
+			'/<script src="[^"]*\/config\.js(?:\?[^"]*)?"><\/script>/',
+			'<script>window.BE_CONFIG=' . $config_json . ';</script>' . $config_script,
+			$html,
+			1
 		);
 
 		return $html;
