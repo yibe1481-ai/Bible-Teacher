@@ -75,12 +75,23 @@
 		if ( ! initData ) {
 			return Promise.reject( new Error( 'TelegramWebApp.initData is empty — open this app from Telegram.' ) );
 		}
-		return this.post( '/auth/telegram', { initData: initData } ).then( function ( res ) {
-			self.token = res.token;
-			self.user  = res.user;
-			try { localStorage.setItem( 'be_token', res.token ); } catch ( e ) { /* ignore */ }
-			return res.user;
-		} );
+		// Reuse an in-flight auth request so rapid navigation doesn't fire a
+		// burst of identical POSTs (which tripped the backend auth rate limiter).
+		if ( this._authPending ) { return this._authPending; }
+		this._authPending = this.post( '/auth/telegram', { initData: initData } ).then(
+			function ( res ) {
+				self._authPending = null;
+				self.token = res.token;
+				self.user  = res.user;
+				try { localStorage.setItem( 'be_token', res.token ); } catch ( e ) { /* ignore */ }
+				return res.user;
+			},
+			function ( err ) {
+				self._authPending = null;
+				throw err;
+			}
+		);
+		return this._authPending;
 	};
 
 	App.prototype.restoreSession = function () {
@@ -183,13 +194,21 @@
 			return;
 		}
 
-		// Home / profile / league / groups / settings — render optimistically,
-		// authenticate lazily.
+		// Home / profile / league / groups / settings — authenticate. If we
+		// already hold a valid token (restored session) we can render right
+		// away. On auth failure with no token, show an auth error rather than
+		// rendering screens that would fire authenticated API calls with no
+		// token — that previously produced repeated "Missing bearer token"
+		// 401s and rate-limit hits during failed logins.
 		this.authenticate().then( function ( user ) {
 			self.renderRoute( user, r );
-		} ).catch( function () {
+		} ).catch( function ( err ) {
 			self.restoreSession();
-			self.renderRoute( self.user, r );
+			if ( self.token ) { self.renderRoute( self.user, r ); return; }
+			if ( err && err.body && ( err.body.code === 'be_banned' || err.status === 403 ) ) {
+				return self.renderBlocked( err.body.message );
+			}
+			self.renderAuthError( err );
 		} );
 	};
 
