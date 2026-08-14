@@ -35,10 +35,17 @@ class BE_Auth {
 			return null;
 		}
 
-		$secret_key = hash( 'sha256', $token, true );
-
+		// Split into key=>value pairs, URL-decoding each key & value once
+		// (mirrors Telegram's documented algorithm; do not decode a second time).
 		$params = array();
-		parse_str( $init_data, $params );
+		foreach ( explode( '&', $init_data ) as $pair ) {
+			if ( '' === $pair ) {
+				continue;
+			}
+			$parts          = explode( '=', $pair, 2 );
+			$key            = urldecode( $parts[0] );
+			$params[ $key ] = isset( $parts[1] ) ? urldecode( $parts[1] ) : '';
+		}
 		if ( empty( $params['hash'] ) || empty( $params['user'] ) ) {
 			return null;
 		}
@@ -46,17 +53,20 @@ class BE_Auth {
 		$received = $params['hash'];
 		unset( $params['hash'] );
 
-		// Build the data_check_string in sorted order, with % digits unescaped.
-		ksort( $params );
-		$check_string = '';
-		foreach ( $params as $key => $value ) {
-			if ( is_array( $value ) ) {
-				continue;
-			}
-			$check_string .= $key . '=' . rawurldecode( $value ) . "\n";
+		// Build the data_check_string: remaining fields sorted by key, formatted
+		// as "key=value" lines joined by newlines.
+		$sorted = $params;
+		ksort( $sorted );
+		$lines = array();
+		foreach ( $sorted as $key => $value ) {
+			$lines[] = $key . '=' . $value;
 		}
-		$check_string = rtrim( $check_string, "\n" );
+		$check_string = implode( "\n", $lines );
 
+		// Mini App initData is signed with the "WebAppData" secret key — an HMAC
+		// of the bot token — NOT the SHA256(bot_token) used by the classic
+		// Telegram Login Widget.
+		$secret_key = hash_hmac( 'sha256', 'WebAppData', $token, true );
 		$calculated = bin2hex( hash_hmac( 'sha256', $check_string, $secret_key, true ) );
 
 		if ( ! hash_equals( $calculated, $received ) ) {
