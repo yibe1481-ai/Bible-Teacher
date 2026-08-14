@@ -38,14 +38,18 @@ class BE_MiniApp {
 		// Bump to force browsers/WebViews to re-fetch assets after updates.
 		// Use the newest mtime across all app source files so any edit (config,
 		// app, screens, styles) invalidates the whole bundle's cache.
-		$newest = 0;
-		$files  = array( 'index.html', 'config.js', 'app.js', 'styles.css' );
+		$newest  = 0;
+		$checked = array( 'index.html', 'config.js', 'app.js', 'styles.css' );
 		$screens = glob( $this->base_dir . 'screens/*.js' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		if ( is_array( $screens ) ) {
-			$files = array_merge( $files, $screens );
+			$checked = array_merge( $checked, $screens );
 		}
-		foreach ( $files as $file ) {
-			$m = filemtime( $this->base_dir . $file );
+		foreach ( $checked as $file ) {
+			$path = $file;
+			if ( false === strpos( $file, '/' ) ) {
+				$path = $this->base_dir . $file;
+			}
+			$m = filemtime( $path );
 			if ( is_int( $m ) && $m > $newest ) {
 				$newest = $m;
 			}
