@@ -6,3 +6,4 @@ tmp/
 Thumbs.db
 *.swp
 *.swoerror_log
+error_log
