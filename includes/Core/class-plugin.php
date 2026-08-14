@@ -31,8 +31,10 @@ class BE_Plugin {
 		register_deactivation_hook( BIBLE_TEACHER_FILE, array( 'BE_Deactivator', 'deactivate' ) );
 
 		add_action( 'init', array( $this, 'load_textdomain' ) );
+		add_action( 'init', array( $this, 'register_mini_app' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'plugins_loaded', array( $this, 'init_services' ) );
+		add_action( 'template_redirect', array( $this, 'serve_mini_app' ) );
 
 		if ( is_admin() ) {
 			add_action( 'init', array( $this, 'init_admin' ) );
@@ -46,6 +48,24 @@ class BE_Plugin {
 	 */
 	public function load_textdomain() {
 		load_plugin_textdomain( 'bible-teacher', false, dirname( BIBLE_TEACHER_BASENAME ) . '/languages' );
+	}
+
+	/**
+	 * Register the Mini App rewrite rule.
+	 *
+	 * @return void
+	 */
+	public function register_mini_app() {
+		( new BE_MiniApp() )->register_rewrite();
+	}
+
+	/**
+	 * Serve the Mini App when its query var is present.
+	 *
+	 * @return void
+	 */
+	public function serve_mini_app() {
+		( new BE_MiniApp() )->serve();
 	}
 
 	/**

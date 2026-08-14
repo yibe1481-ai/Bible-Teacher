@@ -33,6 +33,10 @@ class BE_Activator {
 			wp_schedule_event( time(), 'daily', 'bible_teacher_verse_fetch' );
 		}
 
+		// Register + flush the Mini App rewrite rule.
+		$mini = new BE_MiniApp();
+		$mini->register_rewrite();
+
 		// Flush rewrite rules so REST is registered cleanly.
 		flush_rewrite_rules();
 	}

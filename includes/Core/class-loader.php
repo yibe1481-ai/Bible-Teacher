@@ -75,6 +75,7 @@ class BE_Loader {
 		'BE_Streak'          => 'Lessons/class-streak-service.php',
 		// Cron.
 		'BE_Cron'            => 'Cron/class-cron.php',
+		'BE_MiniApp'         => 'MiniApp/class-router.php',
 		// Admin (lives outside includes/).
 		'BE_Admin'           => '../admin/class-admin.php',
 		// REST controllers (see includes/REST/controllers).
