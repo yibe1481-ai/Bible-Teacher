@@ -5,4 +5,4 @@ tmp/
 .DS_Store
 Thumbs.db
 *.swp
-*.swo
+*.swoerror_log

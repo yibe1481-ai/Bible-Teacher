@@ -45,12 +45,53 @@ class BE_MiniApp {
 	}
 
 	/**
+	 * Process raw HTML, absolutising relative asset URLs and injecting runtime
+	 * config.
+	 *
+	 * @param string $html Raw HTML.
+	 * @return string
+	 */
+	private function process_html( $html ) {
+		$base = rtrim( $this->base_url, '/' );
+
+		// Absolutise only relative src/href values (paths like styles.css,
+		// screens/home.js). Already-absolute URLs (http://, //, data:, etc.)
+		// are left untouched.
+		$html = preg_replace_callback(
+			'/(<(?:link|script)\s[^>]*?\b(?:href|src)\s*=\s*["\'])([^"\']+)(["\'])/i',
+			function ( $m ) use ( $base ) {
+				$url = $m[2];
+				if ( preg_match( '/^(https?:\/\/|\/\/|data:|#|mailto:|tel:)/i', $url ) ) {
+					return $m[0];
+				}
+				return $m[1] . $base . '/' . ltrim( $url, '/' ) . $m[3];
+			},
+			$html
+		);
+
+		// Inject runtime config before config.js loads.
+		$config_json = wp_json_encode( array(
+			'API_BASE'    => rest_url( 'be/v1' ),
+		) );
+		$html = str_replace(
+			'<script src="' . $base . '/config.js"></script>',
+			'<script>window.BE_CONFIG=' . $config_json . ';</script><script src="' . esc_url( $this->base_url . 'config.js' ) . '"></script>',
+			$html
+		);
+
+		return $html;
+	}
+
+	/**
 	 * Intercept the request when our query var is set and serve the app shell.
+	 *
+	 * Also honours ?be_mini_app=1 via GET for sites using plain permalinks
+	 * (no .htaccess rewrite support).
 	 *
 	 * @return void
 	 */
 	public function serve() {
-		if ( ! get_query_var( 'be_mini_app' ) ) {
+		if ( ! get_query_var( 'be_mini_app' ) && ! isset( $_GET['be_mini_app'] ) ) {
 			return;
 		}
 
@@ -60,34 +101,13 @@ class BE_MiniApp {
 			header( 'X-Robots-Tag: noindex' );
 		}
 
-		// Serve index.html, injecting runtime config for the asset base so the
-		// JS resource URLs are correct even if the app is mounted at a sub-path.
 		$html = file_get_contents( $this->base_dir . 'index.html' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		if ( false === $html ) {
 			status_header( 500 );
 			exit( 'Mini App not found.' );
 		}
 
-		// Shield the external Telegram CDN (must stay absolute), then absolutize the
-		// plugin asset references so relative URLs resolve correctly when mounted
-		// at the rewrite path.
-		$telegram_src = 'https://telegram.org/js/telegram-web-app.js';
-		$html = str_replace( 'src="' . $telegram_src . '"', 'src="__TG_SDK__"', $html );
-		$html = str_replace( 'href="styles.css"', 'href="' . esc_url( $this->base_url . 'styles.css' ) . '"', $html );
-		$html = str_replace( array( 'href="', 'src="' ), array( 'href="' . esc_url( $this->base_url ), 'src="' . esc_url( $this->base_url ) ), $html );
-		$html = str_replace( 'src="__TG_SDK__"', 'src="' . $telegram_src . '"', $html );
-
-		// Feed the runtime config (absolute API base) into config.js immediately.
-		$config_json = wp_json_encode( array(
-			'API_BASE' => rest_url( 'be/v1' ),
-		) );
-		$html = str_replace(
-			'<script src="' . esc_url( $this->base_url . 'config.js' ) . '"></script>',
-			'<script>window.BE_CONFIG=' . $config_json . ';</script><script src="' . esc_url( $this->base_url . 'config.js' ) . '"></script>',
-			$html
-		);
-
-		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput -- contains HTML shell.
+		echo $this->process_html( $html ); // phpcs:ignore WordPress.Security.EscapeOutput
 		exit;
 	}
 
