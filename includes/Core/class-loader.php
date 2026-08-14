@@ -69,6 +69,13 @@ class BE_Loader {
 			'AI_Logger'         => 'AI/class-ai-logger',
 			'OpenAI_Adapter'    => 'AI/adapters/class-openai-compatible-adapter',
 			'Options'           => 'Core/class-options',
+			'AI_Feature'        => 'AI/features/class-ai-feature',
+			'Vocabulary_Generator' => 'AI/features/class-vocabulary-generator',
+			'Quiz_Generator'    => 'AI/features/class-quiz-generator',
+			'Speaking_Scorer'   => 'AI/features/class-speaking-scorer',
+			'Writing_Scorer'    => 'AI/features/class-writing-scorer',
+			'Feedback_Generator'=> 'AI/features/class-feedback-generator',
+			'Preview_Generator' => 'AI/features/class-preview-generator',
 		);
 
 		if ( isset( $folders[ $name ] ) ) {
