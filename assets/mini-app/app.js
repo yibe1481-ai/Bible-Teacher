@@ -268,11 +268,34 @@
 
 	// ---- Errors & helpers --------------------------------------------------
 
-	App.prototype.renderAuthError = function () {
+	App.prototype.renderAuthError = function ( err ) {
 		var mount = document.getElementById( 'app' );
+		var initData = TG ? TG.initData : ( window.BE_DEV_INIT_DATA || '' );
+		var title, sub, code = '';
+		if ( err && err.body && err.body.code ) { code = err.body.code; }
+		if ( ! initData ) {
+			// Running outside Telegram — there is no signed initData to verify.
+			title = '👋 Open this from Telegram';
+			sub = 'This app only works inside Telegram. Open the bot and tap <b>Open Bible English</b> ' +
+				'(or the bot\'s Menu button) — don\'t load the URL in a web browser.';
+		} else if ( code === 'be_rate_limited' ) {
+			title = '⏳ A moment please';
+			sub = 'Too many sign-in attempts in a row. Wait about a minute, then tap <b>Try again</b>.';
+		} else if ( code === 'be_banned' ) {
+			title = '🚫 Access blocked';
+			sub = ( err && err.body && err.body.message ) ? err.body.message : 'Your access has been blocked.';
+		} else {
+			// Running inside Telegram but the server rejected the session —
+			// usually the bot token isn't configured, or the button belongs to a
+			// different bot than the one set in plugin settings.
+			title = '⚠️ Sign-in rejected by server';
+			sub = 'We\'re inside Telegram but the server couldn\'t verify this session. ' +
+				'An admin needs to check the <b>Telegram → Bot token</b> in the Bible Teacher settings.';
+			if ( code ) { sub += ' <span class="hint">(' + code + ')</span>'; }
+		}
 		mount.innerHTML = '<div class="state">' +
-			'<div class="state-title">⚠️ Could not sign you in</div>' +
-			'<p class="state-sub">Please open this app from the Telegram bot by tapping <b>Open Bible English</b>.</p>' +
+			'<div class="state-title">' + title + '</div>' +
+			'<p class="state-sub">' + sub + '</p>' +
 			'<button class="btn" id="auth-retry">Try again</button></div>';
 		var b = document.getElementById( 'auth-retry' );
 		if ( b ) { b.addEventListener( 'click', function () { location.reload(); } ); }
