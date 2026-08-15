@@ -47,6 +47,7 @@ class BE_Auth {
 			$params[ $key ] = isset( $parts[1] ) ? urldecode( $parts[1] ) : '';
 		}
 		if ( empty( $params['hash'] ) || empty( $params['user'] ) ) {
+			@file_put_contents( BIBLE_TEACHER_DIR . 'debug-auth.log', gmdate( 'c' ) . ' FAIL missing_fields hash=' . ( empty( $params['hash'] ) ? 'empty' : 'ok' ) . ' user=' . ( empty( $params['user'] ) ? 'empty' : 'ok' ) . ' keys=' . ( wp_json_encode( array_keys( $params ) ) ) . "\n", FILE_APPEND | LOCK_EX ); // phpcs:ignore
 			return null;
 		}
 
@@ -70,6 +71,18 @@ class BE_Auth {
 		$calculated = bin2hex( hash_hmac( 'sha256', $check_string, $secret_key, true ) );
 
 		if ( ! hash_equals( $calculated, $received ) ) {
+			// TEMP DIAGNOSTIC — record why a real initData was rejected so the
+			// exact divergence can be inspected. Remove after the auth issue is
+			// confirmed fixed.
+			$diag = array(
+				'when'       => gmdate( 'c' ),
+				'keys'       => array_keys( $sorted ),
+				'check'      => $check_string,
+				'received'   => $received,
+				'calculated' => $calculated,
+				'has_plus'   => (bool) preg_match( '/\+/', $init_data ),
+			);
+			@file_put_contents( BIBLE_TEACHER_DIR . 'debug-auth.log', gmdate( 'c' ) . ' ' . wp_json_encode( $diag ) . "\n", FILE_APPEND | LOCK_EX ); // phpcs:ignore
 			return null;
 		}
 
