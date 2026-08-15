@@ -71,20 +71,43 @@ class BE_Auth {
 		$calculated = bin2hex( hash_hmac( 'sha256', $check_string, $secret_key, true ) );
 
 		if ( ! hash_equals( $calculated, $received ) ) {
-			// TEMP DIAGNOSTIC — record why a real initData was rejected so the
-			// exact divergence can be inspected. Remove after the auth issue is
-			// confirmed fixed.
-			$diag = array(
-				'when'       => gmdate( 'c' ),
-				'keys'       => array_keys( $sorted ),
-				'check'      => $check_string,
-				'received'   => $received,
-				'calculated' => $calculated,
-				'has_plus'   => (bool) preg_match( '/\+/', $init_data ),
-			);
-			@file_put_contents( BIBLE_TEACHER_DIR . 'debug-auth.log', gmdate( 'c' ) . ' ' . wp_json_encode( $diag ) . "\n", FILE_APPEND | LOCK_EX ); // phpcs:ignore
-			return null;
-		}
+				// TEMP DIAGNOSTIC — try both approaches and log everything so we
+				// can reverse-engineer which algorithm Telegram actually uses.
+				// Remove after the auth issue is confirmed fixed.
+
+				// Build the raw (undecoded) check string alongside the decoded one.
+				$raw_params = array();
+				foreach ( explode( '&', $init_data ) as $pair ) {
+					if ( '' === $pair ) { continue; }
+					$parts = explode( '=', $pair, 2 );
+					$key   = $parts[0]; // keep raw — no urldecode
+					$raw_params[ $key ] = isset( $parts[1] ) ? $parts[1] : '';
+				}
+				if ( isset( $raw_params['hash'] ) ) {
+					unset( $raw_params['hash'] );
+				}
+				ksort( $raw_params );
+				$raw_lines = array();
+				foreach ( $raw_params as $k => $v ) {
+					$raw_lines[] = $k . '=' . $v;
+				}
+				$check_raw = implode( "\n", $raw_lines );
+
+				$hash_decoded = $calculated;
+				$hash_raw     = bin2hex( hash_hmac( 'sha256', $check_raw, $secret_key, true ) );
+
+				$diag = array(
+					'when'         => gmdate( 'c' ),
+					'keys'         => array_keys( $sorted ),
+					'check_decoded' => substr( $check_string, 0, 600 ),
+					'check_raw'    => substr( $check_raw, 0, 600 ),
+					'received'     => $received,
+					'hash_decoded' => $hash_decoded,
+					'hash_raw'     => $hash_raw,
+				);
+				@file_put_contents( BIBLE_TEACHER_DIR . 'debug-auth.log', gmdate( 'c' ) . ' ' . wp_json_encode( $diag ) . "\n", FILE_APPEND | LOCK_EX ); // phpcs:ignore
+				return null;
+			}
 
 		// Auth date must be recent (within 24h) to avoid replay abuse.
 		if ( ! empty( $params['auth_date'] ) ) {
